@@ -1,4 +1,16 @@
-# CosmoCov (Cibola Edition) ... for more compplex covariances, please go to the CosmoCov_Saguaro_Edition repo 
+# Note
+
+This directory contains the original code forked from [CosmoLike/CosmoCov](https://github.com/CosmoLike/CosmoCov) with the following modifications:
+
+- Super-sample covariance flag `ssc` added to `covpar` struct in [cosmolike_core/theory/structs.c](cosmolike_core/theory/structs.c).
+
+- Super-sample contribution made optional to depend on `ssc` flag in [cosmolike_core/theory/covariances_fourier.c](cosmolike_core/theory/covariances_fourier.c).
+
+- Gaussian contributions imported into [cosmolike_core/theory/covariances_fourier.c](cosmolike_core/theory/covariances_fourier.c) from [CosmoLike/cosmolike_light](https://github.com/CosmoLike/cosmolike_light).
+
+## Below is the original readme file for reference:
+
+# CosmoCov (Cibola Edition) ... for more compplex covariances, please go to the CosmoCov_Saguaro_Edition repo
 Xiao Fang, Elisabeth Krause, Tim Eifler
 
 Configuration Space Covariances for Projected Galaxy 2-Point Statistics, built on **CosmoLike**. We provide a flat sky covariance module, computed with the 2D-FFTLog algorithm, and a curved sky covariance module. We also provide a response covariance module written by Alex Barreira and Elisabeth Krause.
@@ -12,12 +24,12 @@ For more details, see [CosmoCov_Notes.pdf](CosmoCov_Notes.pdf).
 ## Quick Guide
 
 CosmoCov require a recent <span>gcc</span> compiler,
-as well as the <span>gsl</span> and <span>FFTW</span> libraries. 
+as well as the <span>gsl</span> and <span>FFTW</span> libraries.
 To get started with computing covariances, follow the steps below:
 
 1.  Clone this repository to the directory you like;
 
-2.  Navigate to the <span>covs</span> directory and run command:  
+2.  Navigate to the <span>covs</span> directory and run command:
     ```shell
     $ make covs
     ```
@@ -28,7 +40,7 @@ To get started with computing covariances, follow the steps below:
     approximation for galaxy-galaxy lensing and cosmic shear angular
     spectra, but non-Limber for galaxy clustering angular spectra);
 
-4.  As an exmaple, run command:  
+4.  As an exmaple, run command:
     ```shell
     $ ./cov 1 ini_files/cov_test_g.ini
     ```
@@ -39,7 +51,7 @@ To get started with computing covariances, follow the steps below:
     `output/out_cov_test`.
 
 5.  There are 66 blocks in total for the example run above. One can
-    compute all of them by running command:  
+    compute all of them by running command:
     ```shell
     $ for i in {1..66}; do ./cov $i ini_files/cov_test_g.ini; done
     ```
@@ -54,7 +66,7 @@ To get started with computing covariances, follow the steps below:
 
 6.  After all the blocks are computed, you can make a plot of the precision
     matrix by first combining all the blocks and then running the
-    provided plotting script <span>plot.py</span>:  
+    provided plotting script <span>plot.py</span>:
     ```shell
     $ f="cov_test"; cat output/out_cov_test/t* > $f; python plot.py $f
     ```
@@ -76,7 +88,7 @@ The ini files contain all the settings, including
   - `sigma_e`: the total shape noise of the weak lensing measurement,
 
   - `lens_tomogbias`: the linear galaxy bias parameter of each lens galaxy bin,
-  
+
   - `lens_tomo_bmag`: the magnification bias parameter of each lens galaxy bin (with `b_mag` described in Section 5.1.3 of [Fang et al. (arXiv:1911.11947)](https://arxiv.org/abs/1911.11947)),
 
   - `IA`: 0 or 1, the switch of running the intrinsic alignment NLA model,
@@ -105,15 +117,15 @@ The ini files contain all the settings, including
 The covariances will be output as separate blocks in `output/out_cov_.../`, with each block representing the covariance matrix of two 2-point functions. The header of each file contains a list of papers to be cited based on the module used.
 
 The ordering of the data vector this covariance corresponds to is also output in various `order_...` files. The columns are
-  
+
   - column 0: index i;
-    
+
   - column 1: bin-averaged angular scale (in radians);
-    
+
   - column 2: the type of the 2-point function `w, gammat, xi+, xi-`;
-    
+
   - column 3, 4: the {s: source, l: lens} galaxy tomographic bin index 1 and 2.
-  
+
 The columns of each covariance block (in `output/out_cov_.../`) are
 
   - column 0, 1: matrix indices of the element in the full covariance matrix;
@@ -174,7 +186,7 @@ covariance (available for weak lensing only), please also cite:
   - [A. Barreira, E. Krause, F. Schmidt; *Complete super-sample lensing
     covariance in the response approach*;
     arXiv:1711.07467](https://ui.adsabs.harvard.edu/abs/2018JCAP...06..015B/exportcitation);
-    
+
   - [A.S. Schmidt, S.D.M. White, F. Schmidt, J. Stücker; *Cosmological
     N-body simulations with a large-scale tidal field*;
     arXiv:1803.03274](https://ui.adsabs.harvard.edu/abs/2018MNRAS.479..162S/exportcitation)
