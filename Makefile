@@ -1,4 +1,3 @@
-
 opts := -g -lgsl -lgslcblas -std=c99 -lm -ICosmoCov -funroll-loops -ffast-math -O3 -lfftw3
 
 shear_clcov:
