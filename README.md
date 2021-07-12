@@ -1,4 +1,4 @@
-# CosmoCov_ClCov - shear harmonic space covariance
+# CosmoCov_ClCov - harmonic-space shear covariance
 
 Fork of [CosmoLike/CosmoCov](https://github.com/CosmoLike/CosmoCov) with interface for shear harmonic space covariance.
 
