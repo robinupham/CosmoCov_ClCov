@@ -2,6 +2,8 @@
 CosmoLike Configuration Space Covariances for Projected Galaxy 2-Point Statistics
 https://github.com/CosmoLike/CosmoCov
 by CosmoLike developers
+
+Modified to include Gaussian covs from cosmolike_light and to allow SSC flag.
 ******************************************************************************/
 
 /************************* covariance routines for angular power spectra *********************/
@@ -10,23 +12,32 @@ by CosmoLike developers
 /*!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!*/
 /************************* routines for angular trispectrum terms ************************/
 /********************           AUTO-COVARIANCE BLOCKS              **********************/
-/* Note: Gaussian covs are defined in each covariances_real routine */
-/*       Only NG covs are here */
-
 double cov_NG_shear_shear_tomo(double l1,double l2, int z1, int z2, int z3, int z4);
+double cov_G_shear_shear_tomo(double l, double delta_l, int z1, int z2, int z3, int z4);
+
 double cov_NG_gl_gl_tomo(double l1,double l2, int z1l, int z1s, int z2l, int z2s);
+double cov_G_gl_gl_tomo(double l, double delta_l, int z1, int z2, int z3, int z4);
+
 double cov_NG_cl_cl_tomo(double l1,double l2, int z1, int z2, int z3, int z4);
+double cov_G_cl_cl_tomo(double l, double delta_l, int z1, int z2, int z3, int z4);
 
 /********************          CROSS-COVARIANCE BLOCKS              **********************/
 double cov_NG_gl_shear_tomo(double l1,double l2, int zl, int zs, int z1, int z2);//zl,zs g-g lensing bins; z3,z4 shear bins
+double cov_G_gl_shear_tomo(double l, double delta_l, int zl, int zs, int z1, int z2);
+
 double cov_NG_cl_shear_tomo(double l1,double l2, int z1, int z2, int z3, int z4); //z1,z2 clustering bins; z3,z4 shear bins
+double cov_G_cl_shear_tomo(double l, double delta_l, int z1, int z2, int z3, int z4);
+
 double cov_NG_cl_gl_tomo(double l1,double l2, int z1, int z2, int zl, int zs); //z1,z2 clustering bins; zl,zs g-g lensing bins
+double cov_G_cl_gl_tomo(double l, double delta_l, int z1, int z2, int zl, int zs);
 
 int cNG = 1;
+int SSC = 1;
 /************** shear x shear routines ***************/
 double inner_project_tri_cov_shear_shear_tomo(double a,void *params)
 {
   cNG = covparams.cng;
+  SSC = covparams.ssc;
   double k1,k2,fK,weights,res = 0.;
   double *ar = (double *) params;
   fK = f_K(chi(a));
@@ -34,8 +45,8 @@ double inner_project_tri_cov_shear_shear_tomo(double a,void *params)
   k2 = (ar[1]+0.5)/fK;
   weights = W_kappa(a,fK,ar[2])*W_kappa(a,fK,ar[3])*W_kappa(a,fK,ar[4])*W_kappa(a,fK,ar[5])*dchi_da(a);
   if (weights >0.){
-    if (cNG) {res = tri_matter_cov(k1,k2,a)*pow(fK,-6.)/(survey.area*survey.area_conversion_factor);}
-    res += delP_SSC(k1,a)*delP_SSC(k2,a)*survey_variance(a,ar[6])*pow(fK,-4.); //SSC
+    if (cNG) { res += tri_matter_cov(k1,k2,a)*pow(fK,-6.)/(survey.area*survey.area_conversion_factor); }
+    if (SSC) { res += delP_SSC(k1,a)*delP_SSC(k2,a)*survey_variance(a,ar[6])*pow(fK,-4.); } //SSC
   }
   res *= weights;
   return res;
@@ -59,6 +70,23 @@ double cov_NG_shear_shear_tomo(double l1,double l2, int z1, int z2, int z3, int 
   return int_gsl_integrate_low_precision(inner_project_tri_cov_shear_shear_tomo,(void*)array,a1,a2,NULL,1000);
 }
 
+double cov_G_shear_shear_tomo(double l, double delta_l, int z1, int z2, int z3, int z4){
+  double C13, C14, C23, C24, N13 =0, N14=0, N23=0, N24=0;
+  double fsky = survey.area/41253.0;
+
+  C13 = C_shear_tomo_nointerp(l,z1,z3);
+  C24 = C_shear_tomo_nointerp(l,z2,z4);
+  C14 = C_shear_tomo_nointerp(l,z1,z4);
+  C23 = C_shear_tomo_nointerp(l,z2,z3);
+
+  if (z1 == z3){N13= pow(survey.sigma_e,2.0)/(2.0*nsource(z1)*survey.n_gal_conversion_factor);}
+  if (z1 == z4){N14= pow(survey.sigma_e,2.0)/(2.0*nsource(z1)*survey.n_gal_conversion_factor);}
+  if (z2 == z3){N23= pow(survey.sigma_e,2.0)/(2.0*nsource(z2)*survey.n_gal_conversion_factor);}
+  if (z2 == z4){N24=pow(survey.sigma_e,2.0)/(2.0*nsource(z2)*survey.n_gal_conversion_factor);}
+
+  return (C13*C24+ C13*N24+N13*C24 + C14*C23+C14*N23+N14*C23+N13*N24+N14*N23)/((2.*l+1.)*delta_l*fsky);
+}
+
 /***** gg-lensing x gg-lensing routines ****/
 double bgal_a(double a, double nz){
   return gbias.b1_function(1./a-1.,(int)nz);
@@ -66,6 +94,7 @@ double bgal_a(double a, double nz){
 double inner_project_tri_cov_gl_gl_tomo(double a,void *params)
 {
   cNG = covparams.cng;
+  SSC = covparams.ssc;
   double k1,k2,fK,weights,res = 0.;
   double *ar = (double *) params;
   fK = f_K(chi(a));
@@ -73,8 +102,8 @@ double inner_project_tri_cov_gl_gl_tomo(double a,void *params)
   k2 = (ar[1]+0.5)/fK;
   weights = W_gal(a,ar[2])*W_kappa(a,fK,ar[3])*W_gal(a,ar[4])*W_kappa(a,fK,ar[5])*dchi_da(a);
   if (weights >0.){
-    if (cNG) {res = tri_matter_cov(k1,k2,a)*pow(fK,-6.)/(survey.area*survey.area_conversion_factor);}
-    res +=(delP_SSC(k1,a)-bgal_a(a,ar[2])*Pdelta(k1,a))*(delP_SSC(k2,a)-bgal_a(a,ar[4])*Pdelta(k2,a))*survey_variance(a,ar[6])*pow(fK,-4.); //SSC
+    if (cNG) { res += tri_matter_cov(k1,k2,a)*pow(fK,-6.)/(survey.area*survey.area_conversion_factor); }
+    if (SSC) { res +=(delP_SSC(k1,a)-bgal_a(a,ar[2])*Pdelta(k1,a))*(delP_SSC(k2,a)-bgal_a(a,ar[4])*Pdelta(k2,a))*survey_variance(a,ar[6])*pow(fK,-4.); } //SSC
   }
   res *= weights;
   return res;
@@ -99,11 +128,27 @@ double cov_NG_gl_gl_tomo(double l1,double l2, int z1l, int z1s, int z2l, int z2s
   return int_gsl_integrate_low_precision(inner_project_tri_cov_gl_gl_tomo,(void*)array,a1,a2,NULL,1000);
 }
 
+
+double cov_G_gl_gl_tomo(double l, double delta_l, int z1, int z2, int z3, int z4){
+  double C13, C14, C23, C24, N13 =0, N24=0;
+   double fsky = survey.area/41253.0;
+  C13 = C_cl_tomo_nointerp(l,z1,z3);
+  C24 = C_shear_tomo_nointerp(l,z2,z4);
+  C14 = C_gl_tomo_nointerp(l,z1,z4);
+  C23 = C_gl_tomo_nointerp(l,z3,z2);
+  if (z1 == z3){N13= 1./(nlens(z1)*survey.n_gal_conversion_factor);}
+  if (z2 == z4){N24= pow(survey.sigma_e,2.0)/(2.0*nsource(z2)*survey.n_gal_conversion_factor);}
+
+  return (C13*C24+ C13*N24+N13*C24 + N13*N24+C14*C23)/((2.*l+1.)*delta_l*fsky);
+}
+
+
 /***** clustering x clustering routines ****/
 
 double inner_project_tri_cov_cl_cl_tomo(double a,void *params)
 {
   cNG = covparams.cng;
+  SSC = covparams.ssc;
   double k1,k2,fK,weights,res = 0.;
   double *ar = (double *) params;
   fK = f_K(chi(a));
@@ -111,8 +156,8 @@ double inner_project_tri_cov_cl_cl_tomo(double a,void *params)
   k2 = (ar[1]+0.5)/fK;
   weights = W_gal(a,ar[2])*W_gal(a,ar[3])*W_gal(a,ar[4])*W_gal(a, ar[5])*dchi_da(a);
   if (weights >0.){
-    if (cNG) {res = tri_matter_cov(k1,k2,a)*pow(fK,-6.)/(survey.area*survey.area_conversion_factor);}
-    res += (delP_SSC(k1,a)-2.*bgal_a(a,ar[2])*Pdelta(k1,a))*(delP_SSC(k2,a)-2.*bgal_a(a,ar[4])*Pdelta(k2,a))*survey_variance(a,ar[6])*pow(fK,-4.); //SSC
+    if (cNG) { res += tri_matter_cov(k1,k2,a)*pow(fK,-6.)/(survey.area*survey.area_conversion_factor); }
+    if (SSC) { res += (delP_SSC(k1,a)-2.*bgal_a(a,ar[2])*Pdelta(k1,a))*(delP_SSC(k2,a)-2.*bgal_a(a,ar[4])*Pdelta(k2,a))*survey_variance(a,ar[6])*pow(fK,-4.); } //SSC
   }
   res *= weights;
   return res;
@@ -141,11 +186,26 @@ double cov_NG_cl_cl_tomo(double l1,double l2, int z1, int z2, int z3, int z4){
   return int_gsl_integrate_low_precision(inner_project_tri_cov_cl_cl_tomo,(void*)array,a1,a2,NULL,1000);
 }
 
+
+double cov_G_cl_cl_tomo(double l, double delta_l, int z1, int z2, int z3, int z4){
+  double C13, C14, C23, C24, N13 =0, N14=0, N23=0, N24=0;
+   double fsky = survey.area/41253.0;
+  C13 = C_cl_tomo_nointerp(l,z1,z3);C24 = C_cl_tomo_nointerp(l,z2,z4);
+  C14 = C_cl_tomo_nointerp(l,z1,z4);C23 = C_cl_tomo_nointerp(l,z2,z3);
+  if (z1 == z3){N13= 1./(nlens(z1)*survey.n_gal_conversion_factor);}
+  if (z1 == z4){N14= 1./(nlens(z1)*survey.n_gal_conversion_factor);}
+  if (z2 == z3){N23= 1./(nlens(z2)*survey.n_gal_conversion_factor);}
+  if (z2 == z4){N24= 1./(nlens(z2)*survey.n_gal_conversion_factor);}
+  return ((C13+N13)*(C24+N24)+(C14+N14)*(C23+N23))/((2.*l+1.)*delta_l*fsky);
+}
+
+
 /************** g-g lensing x shear routines ***************/
 
 double inner_project_tri_cov_gl_shear_tomo(double a,void *params)
 {
   cNG = covparams.cng;
+  SSC = covparams.ssc;
   double k1,k2,fK,weights,res = 0.;
   double *ar = (double *) params;
   fK = f_K(chi(a));
@@ -153,8 +213,8 @@ double inner_project_tri_cov_gl_shear_tomo(double a,void *params)
   k2 = (ar[1]+0.5)/fK;
   weights = W_gal(a, ar[2])*W_kappa(a,fK,ar[3])*W_kappa(a,fK,ar[4])*W_kappa(a,fK,ar[5])*dchi_da(a);
   if (weights >0.){
-    if (cNG) {res = tri_matter_cov(k1,k2,a)*pow(fK,-6.)/(survey.area*survey.area_conversion_factor);}
-    res += (delP_SSC(k1,a)-bgal_a(a,ar[2])*Pdelta(k1,a))*(delP_SSC(k2,a))*survey_variance(a,ar[6])*pow(fK,-4.); //SSC
+    if (cNG) { res += tri_matter_cov(k1,k2,a)*pow(fK,-6.)/(survey.area*survey.area_conversion_factor); }
+    if (SSC) { res += (delP_SSC(k1,a)-bgal_a(a,ar[2])*Pdelta(k1,a))*(delP_SSC(k2,a))*survey_variance(a,ar[6])*pow(fK,-4.); } //SSC
   }
   res *= weights;
   return res;
@@ -174,11 +234,26 @@ double cov_NG_gl_shear_tomo(double l1,double l2, int zl, int zs, int z3, int z4)
   return int_gsl_integrate_low_precision(inner_project_tri_cov_gl_shear_tomo,(void*)array,a1,a2,NULL,1000);
 }
 
+
+double cov_G_gl_shear_tomo(double l, double delta_l, int zl, int zs, int z3, int z4){
+  double C13, C14, C23, C24, N13 =0, N14=0, N23=0, N24=0;
+   double fsky = survey.area/41253.0;
+  C13 = C_gl_tomo_nointerp(l,zl,z3);C24 = C_shear_tomo_nointerp(l,zs,z4);
+  C14 = C_gl_tomo_nointerp(l,zl,z4);C23 = C_shear_tomo_nointerp(l,zs,z3);
+  if (zs == z3){N23= pow(survey.sigma_e,2.0)/(2.0*nsource(zs)*survey.n_gal_conversion_factor);}
+  if (zs == z4){N24=pow(survey.sigma_e,2.0)/(2.0*nsource(zs)*survey.n_gal_conversion_factor);}
+
+  return (C13*(C24+N24) + C14*(C23+N23))/((2.*l+1.)*delta_l*fsky);
+
+}
+
+
 /************** clustering x shear routines ***************/
 
 double inner_project_tri_cov_cl_shear_tomo(double a,void *params)
 {
   cNG = covparams.cng;
+  SSC = covparams.ssc;
   double k1,k2,fK,weights,res = 0.;
   double *ar = (double *) params;
   fK = f_K(chi(a));
@@ -186,9 +261,9 @@ double inner_project_tri_cov_cl_shear_tomo(double a,void *params)
   k2 = (ar[1]+0.5)/fK;
   weights = W_gal(a,ar[2])*W_gal(a, ar[3])*W_kappa(a,fK,ar[4])*W_kappa(a,fK,ar[5])*dchi_da(a);
   if (weights >0.){
-    if (cNG) {res = tri_matter_cov(k1,k2,a)*pow(fK,-6.)/(survey.area*survey.area_conversion_factor);}
+    if (cNG) { res += tri_matter_cov(k1,k2,a)*pow(fK,-6.)/(survey.area*survey.area_conversion_factor); }
     // printf("res cNG:%lg , ", res);
-    res += (delP_SSC(k1,a)-2.*bgal_a(a,ar[2])*Pdelta(k1,a))*(delP_SSC(k2,a))*survey_variance(a,ar[6])*pow(fK,-4.); //SSC
+    if (SSC) { res += (delP_SSC(k1,a)-2.*bgal_a(a,ar[2])*Pdelta(k1,a))*(delP_SSC(k2,a))*survey_variance(a,ar[6])*pow(fK,-4.); } //SSC
   }
   // printf("res +SSC, weights:%lg, %lg\n", res, weights);
   res *= weights;
@@ -212,11 +287,24 @@ double cov_NG_cl_shear_tomo(double l1,double l2, int z1, int z2, int z3, int z4)
   return int_gsl_integrate_low_precision(inner_project_tri_cov_cl_shear_tomo,(void*)array,a1,a2,NULL,1000);
 }
 
+
+double cov_G_cl_shear_tomo(double l, double delta_l, int z1, int z2, int z3, int z4){
+  double C13, C14, C23, C24, N13 =0, N14=0, N23=0, N24=0;
+   double fsky = survey.area/41253.0;
+  C13 = C_gl_tomo_nointerp(l,z1,z3);C24 = C_gl_tomo_nointerp(l,z2,z4);
+  C14 = C_gl_tomo_nointerp(l,z1,z4);C23 = C_gl_tomo_nointerp(l,z2,z3);
+
+  return (C13*C24+  C14*C23)/((2.*l+1.)*delta_l*fsky);
+
+}
+
+
 /************** clustering x shear routines ***************/
 
 double inner_project_tri_cov_cl_gl_tomo(double a,void *params)
 {
   cNG = covparams.cng;
+  SSC = covparams.ssc;
   double k1,k2,fK,weights,res = 0.;
   double *ar = (double *) params;
   fK = f_K(chi(a));
@@ -224,8 +312,8 @@ double inner_project_tri_cov_cl_gl_tomo(double a,void *params)
   k2 = (ar[1]+0.5)/fK;
   weights = W_gal(a,ar[2])*W_gal(a,ar[3])*W_gal(a,ar[4])*W_kappa(a,fK,ar[5])*dchi_da(a);
   if (weights >0.){
-    if (cNG) {res = tri_matter_cov(k1,k2,a)*pow(fK,-6.)/(survey.area*survey.area_conversion_factor);}
-    res += (delP_SSC(k1,a)-2.*bgal_a(a,ar[2])*Pdelta(k1,a))*(delP_SSC(k2,a)-bgal_a(a,ar[4])*Pdelta(k2,a))*survey_variance(a,ar[6])*pow(fK,-4.); //SSC
+    if (cNG) { res += tri_matter_cov(k1,k2,a)*pow(fK,-6.)/(survey.area*survey.area_conversion_factor); }
+    if (SSC) { res += (delP_SSC(k1,a)-2.*bgal_a(a,ar[2])*Pdelta(k1,a))*(delP_SSC(k2,a)-bgal_a(a,ar[4])*Pdelta(k2,a))*survey_variance(a,ar[6])*pow(fK,-4.); } //SSC
   }
   res *= weights;
   return res;
@@ -243,6 +331,18 @@ double cov_NG_cl_gl_tomo(double l1,double l2, int z1, int z2, int zl, int zs){ /
   array[5] = (double) zs;
   array[6] = survey.area/41253.0;
   return int_gsl_integrate_low_precision(inner_project_tri_cov_cl_gl_tomo,(void*)array,a1,a2,NULL,1000);
+}
+
+double cov_G_cl_gl_tomo(double l, double delta_l, int z1, int z2, int zl, int zs){
+  double C13, C14, C23, C24, N13 =0, N14=0, N23=0, N24=0;
+   double fsky = survey.area/41253.0;
+  C13 = C_cl_tomo_nointerp(l,z1,zl);C24 = C_gl_tomo_nointerp(l,z2,zs);
+  C14 = C_gl_tomo_nointerp(l,z1,zs);C23 = C_cl_tomo_nointerp(l,z2,zl);
+  if (z1 == zl){N13= 1./(nlens(z1)*survey.n_gal_conversion_factor);}
+  if (z2 == zl){N23= 1./(nlens(z1)*survey.n_gal_conversion_factor);}
+
+  return ((C13+N13)*C24 + C14*(C23 +N23))/((2.*l+1.)*delta_l*fsky);
+
 }
 
 // Binned NG funcs
