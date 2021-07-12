@@ -1,0 +1,12 @@
+# Ignore all files without extension to ignore executables
+*
+!*.*
+!*/
+
+# We still want some files without extensions
+!LICENSE
+!Makefile
+
+# Others to ignore
+*.dSYM
+.vscode
