@@ -168,6 +168,7 @@ typedef struct {
     int ncl;/* number of ell bins */
     int ng;/* ng covariance? */
     int cng;/* cng covariance */
+    int ssc; /* super-sample covariance flag */
     char outdir[200]; /* output directory */
     char filename[200]; /* output file name prefix */
     char C_FOOTPRINT_FILE[200]; /*angular power spectrum of survey footprint, in healpix format */
